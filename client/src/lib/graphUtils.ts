@@ -1,6 +1,6 @@
 import { Node, Edge } from 'reactflow';
 import { Person, Relationship } from '../types';
-import { computeRelations, RelationLabel } from './relationEngine';
+import { RelationLabel } from './relationEngine';
 
 export interface GraphData {
   nodes: Node[];
@@ -32,6 +32,20 @@ export function buildGraphData(
   const edges: Edge[] = relationships.map((rel) => {
     let label = '';
     if (rootId) {
+      const isDirectlyConnectedToRoot = rel.person_a === rootId || rel.person_b === rootId;
+      if (!isDirectlyConnectedToRoot) {
+        label = rel.relation_type;
+        return {
+          id: rel.id,
+          source: rel.person_a,
+          target: rel.person_b,
+          label,
+          type: 'smoothstep',
+          animated: false,
+          style: { strokeWidth: 2 },
+        };
+      }
+
       const sourceRelation = relationMap.get(rel.person_a);
       const targetRelation = relationMap.get(rel.person_b);
 
