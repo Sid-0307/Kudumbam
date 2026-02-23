@@ -10,8 +10,17 @@ interface AddPersonPanelProps {
     age?: number;
     gender?: 'M' | 'F';
     photo_url?: string;
-  }) => void;
+  }) => void | Promise<void>;
   onDelete?: () => void;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function AddPersonPanel({
@@ -25,6 +34,7 @@ export default function AddPersonPanel({
   const [age, setAge] = useState<number | undefined>(undefined);
   const [gender, setGender] = useState<'M' | 'F' | ''>('');
   const [photoUrl, setPhotoUrl] = useState('');
+  const [photoFileError, setPhotoFileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (person) {
@@ -45,10 +55,10 @@ export default function AddPersonPanel({
 
     onSave({
       name: name.trim() || undefined,
-      alias: alias.trim() || undefined,
+      alias: alias.trim() === '' ? '' : alias.trim(),
       age: age,
       gender: gender || undefined,
-      photo_url: photoUrl.trim() || undefined,
+      photo_url: photoUrl.trim() === '' ? '' : photoUrl.trim(),
     });
   };
 
@@ -140,14 +150,68 @@ export default function AddPersonPanel({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Photo URL
+              Photo
             </label>
-            <input
-              type="url"
-              value={photoUrl}
-              onChange={(e) => setPhotoUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
-            />
+            <div className="space-y-3">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  setPhotoFileError(null);
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+
+                  // 2MB soft limit since we store as data URL in DB
+                  const maxBytes = 2 * 1024 * 1024;
+                  if (file.size > maxBytes) {
+                    setPhotoFileError('Please choose an image under 2MB.');
+                    e.target.value = '';
+                    return;
+                  }
+
+                  try {
+                    const dataUrl = await readFileAsDataUrl(file);
+                    setPhotoUrl(dataUrl);
+                  } catch {
+                    setPhotoFileError('Failed to read the selected image.');
+                    e.target.value = '';
+                  }
+                }}
+                className="w-full text-sm"
+              />
+
+              <div className="text-xs text-gray-500">
+                Or paste an image URL below.
+              </div>
+              <input
+                type="url"
+                value={photoUrl.startsWith('data:') ? '' : photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all"
+              />
+
+              {photoFileError && <div className="text-sm text-red-600">{photoFileError}</div>}
+
+              {photoUrl && (
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-amber-200 bg-amber-50">
+                    <img
+                      src={photoUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoUrl('')}
+                    className="px-3 py-2 text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50 transition-colors font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">

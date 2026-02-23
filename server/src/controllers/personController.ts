@@ -5,7 +5,7 @@ export class PersonController {
   static async createPerson(req: Request, res: Response) {
     try {
       const { familyToken } = req.body;
-      const { name, alias, age, photo_url } = req.body;
+      const { name, alias, age, gender, photo_url } = req.body;
 
       if (!name) {
         return res.status(400).json({ error: 'Name is required' });
@@ -15,6 +15,7 @@ export class PersonController {
         name,
         alias,
         age,
+        gender,
         photo_url,
       });
 

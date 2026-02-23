@@ -1,4 +1,15 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+
+async function readErrorMessage(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+    if (data && typeof data.error === 'string') return data.error;
+    if (data && typeof data.message === 'string') return data.message;
+    return `Request failed (${response.status})`;
+  } catch {
+    return `Request failed (${response.status})`;
+  }
+}
 
 export const apiClient = {
   async createFamily(): Promise<{ token: string }> {
@@ -29,7 +40,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to create person');
+    if (!response.ok) throw new Error(await readErrorMessage(response));
     return response.json();
   },
 
@@ -49,7 +60,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update person');
+    if (!response.ok) throw new Error(await readErrorMessage(response));
     return response.json();
   },
 
