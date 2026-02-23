@@ -47,8 +47,33 @@ function PersonNode({ data, selected }: NodeProps<PersonNodeData>) {
             </div>
           )}
         </div>
-        <Handle type="target" position={Position.Top} className="!bg-amber-600 !border-2 !border-white !w-3 !h-3" />
-        <Handle type="source" position={Position.Bottom} className="!bg-amber-600 !border-2 !border-white !w-3 !h-3" />
+        {/* Parent/child connectors (vertical) */}
+        <Handle
+          id="parent-target"
+          type="target"
+          position={Position.Top}
+          className="!bg-amber-600 !border-2 !border-white !w-3 !h-3"
+        />
+        <Handle
+          id="parent-source"
+          type="source"
+          position={Position.Bottom}
+          className="!bg-amber-600 !border-2 !border-white !w-3 !h-3"
+        />
+
+        {/* Spouse connectors (horizontal) */}
+        <Handle
+          id="spouse-source"
+          type="source"
+          position={Position.Left}
+          className="!bg-amber-600 !border-2 !border-white !w-3 !h-3"
+        />
+        <Handle
+          id="spouse-target"
+          type="target"
+          position={Position.Right}
+          className="!bg-amber-600 !border-2 !border-white !w-3 !h-3"
+        />
       </div>
       
       {/* Edit and Delete Icons - appear when selected */}

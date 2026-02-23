@@ -322,13 +322,36 @@ export default function FamilyWorkspace() {
   );
 
   const handleConnect = useCallback(
-    (connection: Connection) => {
-      if (!connection.source || !connection.target) return;
-      // When user drags a connection between two nodes, open the relation panel
-      setSelectedPersons([connection.source, connection.target]);
-      setShowRelationPanel(true);
+    async (connection: Connection) => {
+      if (!token || !connection.source || !connection.target) return;
+      if (connection.source === connection.target) return;
+
+      const sourceHandle = connection.sourceHandle ?? '';
+      const targetHandle = connection.targetHandle ?? '';
+
+      const isSpouseConnection =
+        (sourceHandle && sourceHandle.startsWith('spouse')) ||
+        (targetHandle && targetHandle.startsWith('spouse'));
+
+      const relationType: 'parent' | 'spouse' = isSpouseConnection ? 'spouse' : 'parent';
+
+      try {
+        await apiClient.createRelationship({
+          familyToken: token,
+          person_a: connection.source,
+          person_b: connection.target,
+          relation_type: relationType,
+        });
+        await loadFamilyData();
+        setShowRelationPanel(false);
+        setSelectedPersons([]);
+      } catch (err: any) {
+        console.error('Relationship creation error:', err);
+        const errorMessage = err?.message || err?.error || 'Failed to create relationship';
+        alert(errorMessage);
+      }
     },
-    []
+    [token, loadFamilyData]
   );
 
   const handleEdgesChange = useCallback(
