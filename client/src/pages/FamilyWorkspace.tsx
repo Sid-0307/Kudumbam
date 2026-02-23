@@ -5,17 +5,17 @@ import ReactFlow, {
   Controls,
   MiniMap,
   Node,
-  Edge,
   useNodesState,
   useEdgesState,
   Connection,
   NodeTypes,
   ReactFlowProvider,
   ReactFlowInstance,
+  EdgeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { apiClient } from '../api/client';
-import { Person, Relationship, FamilyData } from '../types';
+import { Person, FamilyData } from '../types';
 import { computeRelations } from '../lib/relationEngine';
 import { buildGraphData, getNodePosition } from '../lib/graphUtils';
 import PersonNode from '../components/PersonNode';
@@ -38,7 +38,7 @@ export default function FamilyWorkspace() {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChangeInternal] = useEdgesState([]);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
   const loadFamilyData = useCallback(async () => {
@@ -159,7 +159,7 @@ export default function FamilyWorkspace() {
                 setShowAddPanel(true);
               },
               onDelete: () => {
-                handleDeletePerson(existingNode.id);
+                handleDeletePerson({ id: existingNode.id, name: personData.name });
               },
             },
             selected: isSelected,
@@ -193,7 +193,7 @@ export default function FamilyWorkspace() {
   }, []);
 
   const handleAddPerson = async (data: {
-    name: string;
+    name?: string;
     alias?: string;
     age?: number;
     gender?: 'M' | 'F';
@@ -201,10 +201,17 @@ export default function FamilyWorkspace() {
   }) => {
     if (!token || !familyData) return;
 
+    const { name, gender, alias, age, photo_url } = data;
+    if (!name || !gender) return;
+
     try {
-      const newPerson = await apiClient.createPerson({
+      await apiClient.createPerson({
         familyToken: token,
-        ...data,
+        name,
+        gender,
+        alias,
+        age,
+        photo_url,
       });
       await loadFamilyData();
       setShowAddPanel(false);
@@ -234,16 +241,23 @@ export default function FamilyWorkspace() {
     }
   };
 
-  const handleDeletePerson = async () => {
-    if (!token || !editingPerson) return;
+  const handleDeletePerson = async (personToDelete?: { id: string; name: string }) => {
+    if (!token) return;
 
-    if (!confirm(`Delete ${editingPerson.name}?`)) return;
+    const target = personToDelete || editingPerson;
+    if (!target) return;
+
+    if (!confirm(`Delete ${target.name}?`)) return;
 
     try {
-      await apiClient.deletePerson(editingPerson.id, token);
+      await apiClient.deletePerson(target.id, token);
       await loadFamilyData();
-      setEditingPerson(null);
-      setRootId(null);
+      if (editingPerson?.id === target.id) {
+        setEditingPerson(null);
+      }
+      if (rootId === target.id) {
+        setRootId(null);
+      }
     } catch (err: any) {
       alert(err.message || 'Failed to delete person');
     }
@@ -291,7 +305,7 @@ export default function FamilyWorkspace() {
   };
 
   const handleNodeDoubleClick = useCallback(
-    (event: React.MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: Node) => {
       const personId = node.id;
       if (selectedPersons.includes(personId)) {
         setSelectedPersons(selectedPersons.filter((id) => id !== personId));
@@ -315,6 +329,30 @@ export default function FamilyWorkspace() {
       setShowRelationPanel(true);
     },
     []
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      onEdgesChangeInternal(changes);
+
+      if (!token) return;
+
+      const removedEdgeIds = changes
+        .filter((change) => change.type === 'remove')
+        .map((change) => change.id);
+
+      if (removedEdgeIds.length === 0) return;
+
+      removedEdgeIds.forEach(async (edgeId) => {
+        try {
+          await apiClient.deleteRelationship(edgeId, token);
+          await loadFamilyData();
+        } catch (err) {
+          console.error('Failed to delete relationship', err);
+        }
+      });
+    },
+    [onEdgesChangeInternal, token, loadFamilyData]
   );
 
   if (loading) {
@@ -376,7 +414,7 @@ export default function FamilyWorkspace() {
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
+            onEdgesChange={handleEdgesChange}
             onConnect={handleConnect}
             onNodeClick={handleNodeClick}
             onNodeDoubleClick={handleNodeDoubleClick}
@@ -392,10 +430,9 @@ export default function FamilyWorkspace() {
             minZoom={0.1}
             maxZoom={2}
           >
-            <Background color="#fbbf24" gap={20} size={1} opacity={0.1} />
+            <Background color="rgba(251, 191, 36, 0.15)" gap={20} size={1} />
             <Controls 
               className="bg-white/80 backdrop-blur-sm border border-amber-200 rounded-lg shadow-lg"
-              style={{ button: { backgroundColor: 'transparent', borderColor: '#fbbf24' } }}
             />
             <MiniMap 
               nodeColor={(node) => {
